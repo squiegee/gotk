@@ -1,0 +1,81 @@
+(load "kadena_repl_sandbox/kda-env/init.repl")
+(load "init-guardians.repl")
+
+(env-enable-repl-natives true)
+(begin-tx)
+(repl-coin-tools.fund-account "temp" "temp-key" 1000.0)
+(commit-tx)
+(env-enable-repl-natives false)
+
+
+(begin-tx)
+(use CWC_NS.cwc)
+(env-sigs [{'key:"gov", 'caps:[(INIT)]}])
+
+(env-data {'ks-ps:["pres-sales-key"], 'ks-tr:["treasury-key"], 'ks-liqu:["liquidity-key"], 'liq:["liq-key"] })
+
+(env-chain-data {"chain-id":"2"})
+(init-supply "pre-sales" (read-keyset 'ks-ps)
+             CWC_NS.cwc-treasury.TREASURY-ACCOUNT CWC_NS.cwc-treasury.TREASURY-GUARD
+             "liq" (read-keyset 'liq))
+
+(commit-tx)
+
+
+
+
+; Create accounts
+(begin-tx)
+(env-data {'alice-ks:["alice-key"], 'bob-ks:["bob-key"]})
+(CWC_NS.cwc.create-account "alice" (read-keyset 'alice-ks))
+(CWC_NS.cwc.create-account "bob" (read-keyset 'bob-ks))
+
+
+
+(expect "Alice balance = 0" 0.0 (CWC_NS.cwc.get-balance "alice"))
+(expect "Bob balance = 0" 0.0 (CWC_NS.cwc.get-balance "bob"))
+
+(commit-tx)
+(env-sigs [])
+
+(begin-tx)
+(use CWC_NS.cwc-treasury)
+(use CWC_NS.cwc)
+(use free.util-math)
+
+(get-balance TREASURY-ACCOUNT)
+
+(commit-tx)
+
+(begin-tx "test CWC")
+(env-keys ["bot"])
+(env-sigs [{'key:"bot", 'caps:[(CWC_NS.cwc-treasury.OPERATE-TREASURY)]}])
+(use CWC_NS.cwc-treasury)
+(send-cwc "bob" 2.0)
+(CWC_NS.cwc.get-balance TREASURY-ACCOUNT)
+(commit-tx)
+
+(begin-tx "test bulk CWC")
+(use CWC_NS.cwc-treasury)
+
+(env-data {
+  'accounts: ["alice", "bob"],
+  'amounts: [2.0, 201.0]
+})
+(env-keys ["bot"])
+(env-sigs [{'key:"bot", 'caps:[(CWC_NS.cwc-treasury.OPERATE-TREASURY)]}])
+(expect-failure "Exceeded TX Amount" "Total transfer exceeds maximum allowed"
+(bulk-send-cwc (read-msg 'accounts) (read-msg 'amounts)))
+
+
+(env-data {
+  'accounts: ["alice", "bob"],
+  'amounts: [2.0, 5.0]
+})
+(env-keys ["bot"])
+(env-sigs [{'key:"bot", 'caps:[(CWC_NS.cwc-treasury.OPERATE-TREASURY)]}])
+(bulk-send-cwc (read-msg 'accounts) (read-msg 'amounts))
+(CWC_NS.cwc.get-balance TREASURY-ACCOUNT)
+
+(commit-tx)
+
